@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">CameraModule</string>
+    <string name="camera_permission_popup_desc">App does not have \n access to your camera. \nTo enable access, tap \n Settings and turn on \n Camera</string>
+    <string name="camera_error">Something wrong. Please tryagain later</string>
+</resources>
