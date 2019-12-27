@@ -5,8 +5,9 @@ import android.os.Bundle;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import in.balakrishnan.cameramodule.camera.CameraBundleBuilder;
-import in.balakrishnan.cameramodule.camera.CameraControllerActivity;
+import in.balakrishnan.easycam.CameraBundleBuilder;
+import in.balakrishnan.easycam.CameraControllerActivity;
+
 
 public class MainActivity extends AppCompatActivity {
 

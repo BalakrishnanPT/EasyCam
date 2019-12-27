@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="in.balakrishnan.easycam" >
+    <uses-permission android:name="android.permission.CAMERA" />
+    <application>
+    <activity
+        android:name="in.balakrishnan.easycam.CameraControllerActivity"
+        android:configChanges="orientation|screenSize"
+        android:launchMode="singleTop"
+        android:screenOrientation="portrait"
+        android:theme="@style/CamAppTheme" />
+    </application>
+</manifest>
