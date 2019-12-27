@@ -15,7 +15,9 @@ buildscript {
         // in the individual module build.gradle files
     }
 }
-
+subprojects{
+    tasks.withType(Javadoc).all{enabled =false}
+}
 allprojects {
     repositories {
         google()
