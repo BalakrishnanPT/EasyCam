@@ -65,13 +65,15 @@ along with the device orientation. We can either enable or disable this.
 #### Change Log
 You can see the change log [here](changeLog/ChangeLog.md)
 
-#### Contribution 
-Interested to contribute to EasyCam, You are one pull request away. 
  
-### Documentation 
+#### Documentation 
 Need more insights? You can get the documentation [here](https://balakrishnanpt.github.io/EasyCam/)
 
-### Contact 
+
+#### Contribution 
+Interested to contribute to EasyCam, You are one pull request away. 
+
+#### Contact 
 Reach out to me in [Twitter](https://twitter.com/BalakrishnanPT)
 
 
