@@ -8,8 +8,8 @@ import android.util.Log;
  * Created by BalaKrishnan on 2019-07-15.
  * <p>
  * This Object is used to create {@link CameraControllerActivity}
- * This model is used to configure both {@link com.toyaround.android.camera.capture.CaptureFragment}
- * and {@link com.toyaround.android.camera.preview.PreviewFragment}
+ * This model is used to configure both {@link in.balakrishnan.easycam.capture.CaptureFragment}
+ * and {@link in.balakrishnan.easycam.preview.PreviewFragment}
  */
 public class CameraBundle implements Parcelable {
     public static final Creator<CameraBundle> CREATOR = new Creator<CameraBundle>() {
