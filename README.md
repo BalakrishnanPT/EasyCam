@@ -26,7 +26,10 @@ We have developed this module while working on one of our project
         startActivityForResult(intent, 214);
   
  3. You will get the results in onActivityResult() callback. 
-    ```@Override
+ 
+ 
+    ```
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == 214) {
