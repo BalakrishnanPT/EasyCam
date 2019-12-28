@@ -62,6 +62,11 @@ The standout point in Easy cam is that all components are configurable
 Also we have thrown in a cool feature that preview badge image will turn
 along with the device orientation. We can either enable or disable this. 
 
+#### Change Log
+You can see the change log [here](changeLog/ChangeLog.md)
+
+#### Contribution 
+Interested to contribute to EasyCam, You are one pull request away. 
  
 
 
