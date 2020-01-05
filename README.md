@@ -26,7 +26,7 @@ We have developed this module while working on one of our project
         startActivityForResult(intent, 214);
   
  3. You will get the results in onActivityResult() callback. 
- 
+
  
     ```
     @Override
