@@ -20,11 +20,9 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
-
 import java.io.File;
 import java.util.Arrays;
 
-import in.balakrishnan.easycam.R;
 import in.balakrishnan.easycam.capture.CaptureFragment;
 import in.balakrishnan.easycam.capture.CaptureFragmentBuilder;
 import in.balakrishnan.easycam.preview.PreviewFragment;
@@ -167,7 +165,6 @@ public class CameraControllerActivity extends AppCompatActivity implements Previ
     public void goToCaptureView() {
         try {
             captureFragment = new CaptureFragmentBuilder().setBundle(io).createCaptureFragment();
-
             getSupportFragmentManager().beginTransaction()
                     .replace(R.id.fl_container, captureFragment)
                     .commit();

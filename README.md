@@ -6,7 +6,7 @@ We have developed this module while working on one of our project
 
 ### How to use
 1. Add dependency in module gradle file  
-   ` implementation 'in.balakrishnan.easycam:easycam:0.0.2'`
+   ` implementation 'in.balakrishnan.easycam:easycam:0.0.3-rc5'`
    
    ` implementation 'androidx.recyclerview:recyclerview:1.1.0'`
    
@@ -34,7 +34,7 @@ We have developed this module while working on one of our project
         startActivityForResult(intent, 214);
   
  3. You will get the results in onActivityResult() callback. 
- 
+
  
     ```
     @Override
