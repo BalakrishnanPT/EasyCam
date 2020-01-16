@@ -34,7 +34,6 @@ public class CameraControllerActivity extends AppCompatActivity implements Previ
     private static final int PERMISSION_REQUEST_CODE = 897;
     PreviewFragment previewFragment;
     CaptureFragment captureFragment;
-    in.balakrishnan.easycam.capture.video.CaptureFragment fragment;
     int orientation = 0;
     int temp = 0;
     CameraBundle io;
@@ -166,9 +165,8 @@ public class CameraControllerActivity extends AppCompatActivity implements Previ
     public void goToCaptureView() {
         try {
             captureFragment = new CaptureFragmentBuilder().setBundle(io).createCaptureFragment();
-            fragment = new in.balakrishnan.easycam.capture.video.CaptureFragment();
             getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.fl_container, fragment)
+                    .replace(R.id.fl_container, captureFragment)
                     .commit();
         } catch (Exception e) {
             e.printStackTrace();

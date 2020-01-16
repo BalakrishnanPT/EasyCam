@@ -19,6 +19,7 @@ import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
+import android.hardware.SensorManager;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -37,33 +38,21 @@ import android.media.ImageReader;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.SystemClock;
-import android.text.TextUtils;
 import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
-import android.view.LayoutInflater;
 import android.view.MotionEvent;
+import android.view.OrientationEventListener;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
-import android.view.ViewGroup;
-import android.view.animation.AnimationSet;
-import android.view.animation.DecelerateInterpolator;
-import android.view.animation.RotateAnimation;
-import android.widget.ImageView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.widget.AppCompatButton;
-import androidx.constraintlayout.widget.ConstraintLayout;
-import androidx.constraintlayout.widget.ConstraintSet;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
-import androidx.lifecycle.Observer;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -78,17 +67,14 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 import in.balakrishnan.easycam.CameraControllerActivity;
-import in.balakrishnan.easycam.CameraControllerViewModel;
-import in.balakrishnan.easycam.CaptureData;
 import in.balakrishnan.easycam.FileUtils;
 import in.balakrishnan.easycam.R;
-import in.balakrishnan.easycam.StatusBarUtil;
 import in.balakrishnan.easycam.imageBadgeView.ImageBadgeView;
 
 import static android.media.ExifInterface.ORIENTATION_UNDEFINED;
 
 
-public abstract class CameraBaseFragment extends Fragment
+public abstract class EasyCamFragment extends Fragment
         implements ActivityCompat.OnRequestPermissionsResultCallback {
 
     /**
@@ -151,64 +137,14 @@ public abstract class CameraBaseFragment extends Fragment
 
     //************************** Setup Flags **********************************
 
-    CameraControllerViewModel cameraControllerViewModel;
     /**
      * A {@link CameraCaptureSession.CaptureCallback} that handles events related to JPEG capture.
      */
 
     boolean isCameraOpen = false;
-    /**
-     * Preview visibility control set true to make it visible
-     */
-    private boolean previewIconVisibility;
-    /**
-     * Set flag as true to enable preview page redirection
-     */
-    private boolean previewPageRedirection;
-    /**
-     * Set this flag as true to enable no of photos taken above Preview icon, This is linked with {@see previewIconVisibility}
-     */
-    private boolean previewEnableCount;
-    /**
-     * Set this flag true to enable / visible done button,
-     * which is usually used for finishing the capture of image
-     */
-    private boolean enableDone;
-    /**
-     * This String used to alter the value of Done / Finish button
-     */
-    private String doneButtonString;
-    /**
-     * This 'int' value is used to set value background for Capture button
-     */
-    private int captureButtonDrawable;
-    /**
-     * This 'int' value is used to set value background for Done button
-     */
-    private int doneButtonDrawable;
-    /**
-     * This value specifies minimum number of photos required
-     */
-    private int min_photo;
-    /**
-     * This value specifies maximum number of photos allowed
-     */
-    private int max_photo;
-    /**
-     * Set this flag as true, if you need to take single image
-     * If you set this as true, After taking single picture camera module will be closed automatically.
-     */
-    private boolean singlePhotoMode;
-    /**
-     * Set this flag as true to make preview as full screen preview
-     */
-    private boolean fullscreenMode;
-    /**
-     * Set this flag as true to enable manual focusing in capture module
-     */
-    private boolean manualFocus;
-
     //*************************************************************************
+    int orientation = 0;
+    int temp = 0;
     /**
      * Set this flag as true to enable 'Preview' and 'Done' views animation using orientation
      */
@@ -282,17 +218,43 @@ public abstract class CameraBaseFragment extends Fragment
      */
     private int mSensorOrientation;
     private CameraSelection cameraSelection = CameraSelection.BACK;
-    private OnCaptureInteractionListener mListener;
+    /**
+     * {@link TextureView.SurfaceTextureListener} handles several lifecycle events on a
+     * {@link TextureView}.
+     */
+    private final TextureView.SurfaceTextureListener mSurfaceTextureListener
+            = new TextureView.SurfaceTextureListener() {
+
+        @Override
+        public void onSurfaceTextureAvailable(SurfaceTexture texture, int width, int height) {
+            Log.d(TAG, "requestCameraPermission: mSurfaceTextureListener ");
+            openCamera(width, height);
+        }
+
+        @Override
+        public void onSurfaceTextureSizeChanged(SurfaceTexture texture, int width, int height) {
+            Log.d(TAG, "onSurfaceTextureSizeChanged: " + width);
+            Log.d(TAG, "onSurfaceTextureSizeChanged: " + height);
+            configureTransform(width, height);
+        }
+
+        @Override
+        public boolean onSurfaceTextureDestroyed(SurfaceTexture texture) {
+            return true;
+        }
+
+        @Override
+        public void onSurfaceTextureUpdated(SurfaceTexture texture) {
+        }
+
+    };
     private boolean mManualFocusEngaged = false;
     private ImageBadgeView badgeImageView;
     private float startX;
     private float startY;
     private long mLastClickTime = 0L;
     private int fromDegree = 0;
-    private TextView btnDone;
-    private AppCompatButton btnCapture;
     private String bucketName = "default";
-    private ImageView ivSwitchCamera, ivFlash;
     private FlashType flashType = FlashType.OFF;
     private CameraCaptureSession.CaptureCallback mCaptureCallback
             = new CameraCaptureSession.CaptureCallback() {
@@ -333,7 +295,7 @@ public abstract class CameraBaseFragment extends Fragment
 
         private void capturePicture(CaptureResult result) {
             Integer afState = result.get(CaptureResult.CONTROL_AF_STATE);
-            if (afState == null || cameraControllerViewModel.getCameraSelection() == CameraSelection.FRONT) {
+            if (afState == null || cameraSelection == CameraSelection.FRONT) {
                 Log.d(TAG, "process: captureStillPicture afState == null ");
                 mState = STATE_PICTURE_TAKEN;
                 captureStillPicture();
@@ -399,79 +361,8 @@ public abstract class CameraBaseFragment extends Fragment
         }
 
     };
-    /**
-     * {@link TextureView.SurfaceTextureListener} handles several lifecycle events on a
-     * {@link TextureView}.
-     */
-    private final TextureView.SurfaceTextureListener mSurfaceTextureListener
-            = new TextureView.SurfaceTextureListener() {
-
-        @Override
-        public void onSurfaceTextureAvailable(SurfaceTexture texture, int width, int height) {
-            Log.d(TAG, "requestCameraPermission: mSurfaceTextureListener ");
-            openCamera(width, height);
-        }
-
-        @Override
-        public void onSurfaceTextureSizeChanged(SurfaceTexture texture, int width, int height) {
-            Log.d(TAG, "onSurfaceTextureSizeChanged: " + width);
-            Log.d(TAG, "onSurfaceTextureSizeChanged: " + height);
-            configureTransform(width, height);
-        }
-
-        @Override
-        public boolean onSurfaceTextureDestroyed(SurfaceTexture texture) {
-            return true;
-        }
-
-        @Override
-        public void onSurfaceTextureUpdated(SurfaceTexture texture) {
-        }
-
-    };
-    private boolean launchNextActivity = false;
-
-    public CameraBaseFragment() {
-
-    }
-
-//    static CameraBaseFragment newInstance(boolean previewIconVisibility,
-//                                          boolean previewPageRedirection,
-//                                          boolean previewEnableCount,
-//                                          boolean enableDone,
-//                                          String doneButtonString,
-//                                          int captureButtonDrawable,
-//                                          int doneButtonDrawable,
-//                                          int MIN_PHOTO,
-//                                          int MAX_PHOTO,
-//                                          boolean singlePhotoMode,
-//                                          boolean fullscreenMode,
-//                                          boolean manualFocus,
-//                                          boolean enableRotationAnimation,
-//                                          String bucketName,
-//                                          boolean launchNextActivity) {
-//
-//        Bundle args = new Bundle();
-//        args.putBoolean("previewIconVisibility", previewIconVisibility);
-//        args.putBoolean("previewPageRedirection", previewPageRedirection);
-//        args.putBoolean("previewEnableCount", previewEnableCount);
-//        args.putBoolean("enableDone", enableDone);
-//        args.putString("doneButtonString", doneButtonString);
-//        args.putInt("captureButtonDrawable", captureButtonDrawable);
-//        args.putInt("doneButtonDrawable", doneButtonDrawable);
-//        args.putInt("MIN_PHOTO", MIN_PHOTO);
-//        args.putInt("MAX_PHOTO", MAX_PHOTO);
-//        args.putBoolean("singlePhotoMode", singlePhotoMode);
-//        args.putBoolean("fullscreenMode", fullscreenMode);
-//        args.putBoolean("manualFocus", manualFocus);
-//        args.putBoolean("enableRotationAnimation", enableRotationAnimation);
-//        args.putBoolean("launchNextActivity", launchNextActivity);
-//        args.putString("bucketName", bucketName);
-//
-//        CameraBaseFragment fragment = new CameraBaseFragment();
-//        fragment.setArguments(args);
-//        return fragment;
-//    }
+    private boolean manualFocus = true;
+    private boolean fullscreenMode = false;
 
     /**
      * Given {@code choices} of {@code Size}s supported by a camera, choose the smallest one that
@@ -523,137 +414,6 @@ public abstract class CameraBaseFragment extends Fragment
     }
 
     /**
-     * Load values from Bundle when ever require
-     */
-    public void loadValuesFromBundle() {
-        Bundle b = getArguments();
-        previewIconVisibility = b.getBoolean("previewIconVisibility", true);
-        previewPageRedirection = b.getBoolean("previewPageRedirection", true);
-        previewEnableCount = b.getBoolean("previewEnableCount", true);
-        enableDone = b.getBoolean("enableDone", true);
-        doneButtonString = b.getString("doneButtonString", "Done");
-        captureButtonDrawable = b.getInt("captureButtonDrawable", 0);
-        doneButtonDrawable = b.getInt("doneButtonDrawable", 0);
-        min_photo = b.getInt("MIN_PHOTO", 0);
-        max_photo = b.getInt("MAX_PHOTO", 100);
-        singlePhotoMode = b.getBoolean("singlePhotoMode", false);
-        fullscreenMode = b.getBoolean("fullscreenMode", false);
-        manualFocus = b.getBoolean("manualFocus", true);
-        enableRotationAnimation = b.getBoolean("enableRotationAnimation", true);
-        launchNextActivity = b.getBoolean("launchNextActivity", true);
-        bucketName = b.getString("bucketName", "");
-    }
-
-    public boolean isPreviewIconVisiblity() {
-        return previewIconVisibility;
-    }
-
-    public void setPreviewIconVisiblity(boolean previewIconVisiblity) {
-        this.previewIconVisibility = previewIconVisiblity;
-    }
-
-    public boolean isPreviewPageRedirection() {
-        return previewPageRedirection;
-    }
-
-    public void setPreviewPageRedirection(boolean previewPageRedirection) {
-        this.previewPageRedirection = previewPageRedirection;
-    }
-
-    public boolean isPreviewEnableCount() {
-        return previewEnableCount;
-    }
-
-    /**
-     * This a callback object for the {@link ImageReader}. "onImageAvailable" will be called when a
-     * still image is ready to be saved.
-     */
-
-    public void setPreviewEnableCount(boolean previewEnableCount) {
-        this.previewEnableCount = previewEnableCount;
-    }
-
-    public boolean isEnableDone() {
-        return enableDone;
-    }
-
-    public void setEnableDone(boolean enableDone) {
-        this.enableDone = enableDone;
-    }
-
-    public String getDoneButtonString() {
-        return doneButtonString;
-    }
-
-    public void setDoneButtonString(String doneButtonString) {
-        this.doneButtonString = doneButtonString;
-    }
-
-    public int getCaptureButtonDrawable() {
-        return captureButtonDrawable;
-    }
-
-    public void setCaptureButtonDrawable(int captureButtonDrawable) {
-        this.captureButtonDrawable = captureButtonDrawable;
-    }
-
-    public int getDoneButtonDrawable() {
-        return doneButtonDrawable;
-    }
-
-    public void setDoneButtonDrawable(int doneButtonDrawable) {
-        this.doneButtonDrawable = doneButtonDrawable;
-    }
-
-    public int getMIN_PHOTO() {
-        return min_photo;
-    }
-
-    public void setMIN_PHOTO(int MIN_PHOTO) {
-        this.min_photo = MIN_PHOTO;
-    }
-
-    public int getMAX_PHOTO() {
-        return max_photo;
-    }
-
-    public void setMAX_PHOTO(int MAX_PHOTO) {
-        this.max_photo = MAX_PHOTO;
-    }
-
-    public boolean isSinglePhotoMode() {
-        return singlePhotoMode;
-    }
-
-    public void setSinglePhotoMode(boolean singlePhotoMode) {
-        this.singlePhotoMode = singlePhotoMode;
-    }
-
-    public boolean isFullscreenMode() {
-        return fullscreenMode;
-    }
-
-    public void setFullscreenMode(boolean fullscreenMode) {
-        this.fullscreenMode = fullscreenMode;
-    }
-
-    public boolean isManualFocus() {
-        return manualFocus;
-    }
-
-    public void setManualFocus(boolean manualFocus) {
-        this.manualFocus = manualFocus;
-    }
-
-    public boolean isEnableRotationAnimation() {
-        return enableRotationAnimation;
-    }
-
-    public void setEnableRotationAnimation(boolean enableRotationAnimation) {
-        this.enableRotationAnimation = enableRotationAnimation;
-    }
-
-    /**
      * Shows a {@link Toast} on the UI thread.
      *
      * @param text The message to show
@@ -670,120 +430,21 @@ public abstract class CameraBaseFragment extends Fragment
         }
     }
 
-    @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
-        StatusBarUtil.showStatusBar(this);
-        return inflater.inflate(R.layout.fragment_camera2_basic, container, false);
-    }
-
     @SuppressLint("ClickableViewAccessibility")
     @Override
     public void onViewCreated(final View view, Bundle savedInstanceState) {
-
-        cameraControllerViewModel = ((CameraControllerActivity) getActivity()).obtainViewModel();
-        cameraSelection = cameraControllerViewModel.getCameraSelection();
-        flashType = cameraControllerViewModel.getFlashType();
-        loadValuesFromBundle();
-
+        flashType = FlashType.AUTO;
         initializeViews(view);
-
-        setUpView(view);
-
         setUpListeners(view);
     }
 
     /**
-     * Setup observers for Live Data in the {@link CameraControllerViewModel} and Listeners for view clicks
+     * Setup observers and Listeners for view clicks
      *
      * @param view Root view
      */
     @SuppressLint("ClickableViewAccessibility")
     private void setUpListeners(final View view) {
-        cameraControllerViewModel.ld_captureData.observe(getViewLifecycleOwner(), new Observer<List<CaptureData>>() {
-            @Override
-            public void onChanged(List<CaptureData> captureData) {
-                Log.d(TAG, "onChanged: ");
-                if (previewIconVisibility & cameraControllerViewModel.bitmapList.size() > 0) {
-                    // Set Thumb image from List
-                    badgeImageView.setImageBitmap(captureData.get(captureData.size() - 1).getThumbBitmap());
-                    if (previewEnableCount)
-                        //Update the No of image in view
-                        badgeImageView.setBadgeValue(cameraControllerViewModel.bitmapList.size());
-                } else {
-                    // This part is called when there is no value in list
-                    // Removes the Preview view from teh view
-                    badgeImageView.setImageBitmap(null);
-                    badgeImageView.setBadgeValue(0);
-                }
-                if (captureData.size() >= max_photo)
-                    view.findViewById(R.id.btn_capture).setAlpha(.5f);
-                else
-                    view.findViewById(R.id.btn_capture).setAlpha(1.0f);
-
-            }
-        });
-
-        cameraControllerViewModel.tempBitmap.observe(getViewLifecycleOwner(), new Observer<CaptureData>() {
-            @Override
-            public void onChanged(CaptureData captureData) {
-                Log.d(TAG, "onChanged: " + captureData.getOriginalFileName());
-                if (cameraControllerViewModel.bitmapList.size() < 5) {
-                    cameraControllerViewModel.addToList(captureData);
-                }
-            }
-        });
-
-        view.findViewById(R.id.ibv_icon2).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (previewPageRedirection && cameraControllerViewModel.bitmapList.size() > 0 && TextUtils.isEmpty(cameraControllerViewModel.getPeekValue()))
-                    mListener.goToPreviewMode();
-            }
-        });
-
-        view.findViewById(R.id.btn_capture).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // mis-clicking prevention, using threshold of 600 ms
-                if (SystemClock.elapsedRealtime() - mLastClickTime < 600) {
-                    return;
-                }
-                mLastClickTime = SystemClock.elapsedRealtime();
-                Log.d(TAG, "onClick: " + cameraControllerViewModel.bitmapList.size());
-                if (cameraControllerViewModel.bitmapList.size() >= max_photo) {
-                    Toast.makeText(requireContext(), "You have reached maximum limit", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                takePicture();
-            }
-        });
-        /**
-         * Close button Click Listener
-         */
-        view.findViewById(R.id.iv_capture_close).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                requireActivity().finish();
-            }
-        });
-        /**
-         * Done button Click Listener
-         */
-        btnDone.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (TextUtils.isEmpty(cameraControllerViewModel.getPeekValue())) {
-                    Log.d(TAG, "onClick: " + min_photo);
-                    Log.d(TAG, "onClick: " + cameraControllerViewModel.bitmapList.size());
-                    if (cameraControllerViewModel.bitmapList.size() < min_photo) {
-                        Toast.makeText(requireContext(), "Require minimum " + NumberToWords.convert(min_photo) + (min_photo > 1 ? " photos" : " photo"), Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    mListener.onComplete();
-                }
-            }
-        });
         /**
          * Preview View Touch Listener for Manual focus
          */
@@ -814,26 +475,6 @@ public abstract class CameraBaseFragment extends Fragment
                 return true;
             }
         });
-
-        ivSwitchCamera.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                closeCamera(true);
-            }
-        });
-
-        ivFlash.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-                flashType = FlashType.getInstance((flashType.getCurrentType() + 1) % 3);
-                cameraControllerViewModel.setFlashType(flashType);
-                Log.d(TAG, "onClick: " + flashType);
-                createCameraPreviewSession();
-                ivFlash.setImageDrawable(getResources().getDrawable(cameraControllerViewModel.getFlashType().getResourceId()));
-            }
-
-        });
     }
 
     /**
@@ -844,42 +485,7 @@ public abstract class CameraBaseFragment extends Fragment
     private void initializeViews(View view) {
         mTextureView = view.findViewById(getTextureResource());
         mTextureView.setFullScreenMode(fullscreenMode);
-        btnDone = view.findViewById(R.id.btn_capture_add);
-        btnCapture = view.findViewById(R.id.btn_capture);
-        badgeImageView = view.findViewById(R.id.ibv_icon2);
-    }
-
-    /**
-     * Setup views with control variables from {@link CaptureFragmentBuilder}
-     *
-     * @param view
-     */
-    private void setUpView(View view) {
-        if (!fullscreenMode) {
-            ConstraintLayout layout = view.findViewById(R.id.capture_container);
-            ConstraintSet constraintSet = new ConstraintSet();
-            constraintSet.clone(layout);
-            constraintSet.connect(R.id.texture, ConstraintSet.TOP, R.id.iv_capture_close, ConstraintSet.BOTTOM, 0);
-            constraintSet.connect(R.id.texture, ConstraintSet.RIGHT, layout.getId(), ConstraintSet.RIGHT, 0);
-            constraintSet.connect(R.id.texture, ConstraintSet.LEFT, layout.getId(), ConstraintSet.LEFT, 0);
-            constraintSet.applyTo(layout);
-            mTextureView.requestLayout();
-        }
-        if (!previewIconVisibility)
-            badgeImageView.setVisibility(View.GONE);
-        if (previewEnableCount) {
-            badgeImageView.visibleBadge(false);
-        }
-        if (captureButtonDrawable != 0)
-            btnCapture.setBackground(getActivity().getDrawable(captureButtonDrawable));
-        if (doneButtonDrawable != 0)
-            btnDone.setBackground(getActivity().getDrawable(doneButtonDrawable));
-        btnDone.setVisibility(enableDone ? View.VISIBLE : View.GONE);
-        btnDone.setText(doneButtonString);
-        ivSwitchCamera = view.findViewById(R.id.iv_switch_cam);
-        ivFlash = view.findViewById(R.id.iv_flash);
-        ivFlash.setImageDrawable(getResources().getDrawable(cameraControllerViewModel.getFlashType().resourceId));
-        Log.d(TAG, "setUpView: " + cameraControllerViewModel.getFlashType());
+        setUpScreenOrientationListener();
     }
 
     /**
@@ -916,12 +522,8 @@ public abstract class CameraBaseFragment extends Fragment
         CameraCharacteristics characteristics = null;
         try {
             characteristics = manager.getCameraCharacteristics(mCameraId);
-
             final Rect sensorArraySize = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
-
-            //TODO: here I ju
-            //
-            // st flip x,y, but this needs to correspond with the sensor orientation (via SENSOR_ORIENTATION)
+            //TODO: here I just flip x,y, but this needs to correspond with the sensor orientation (via SENSOR_ORIENTATION)
             final int y = (int) ((motionEvent.getX() / (float) view.getWidth()) * (float) sensorArraySize.height());
             final int x = (int) ((motionEvent.getY() / (float) view.getHeight()) * (float) sensorArraySize.width());
             final int halfTouchWidth = (int) motionEvent.getTouchMajor(); //TODO: this doesn't represent actual touch size in pixel. Values range in [3, 10]...
@@ -1016,7 +618,6 @@ public abstract class CameraBaseFragment extends Fragment
         mFile = FileUtils.getFile(getContext(), bucketName, "pic.jgp");
     }
 
-
     @Override
     public void onResume() {
         super.onResume();
@@ -1027,11 +628,7 @@ public abstract class CameraBaseFragment extends Fragment
         // a camera and start preview from here (otherwise, we wait until the surface is ready in
         // the SurfaceTextureListener).
         if (mTextureView.isAvailable()) {
-            {
-                Log.d(TAG, "requestCameraPermission: onResume ");
-
-                openCamera(mTextureView.getWidth(), mTextureView.getHeight());
-            }
+            openCamera(mTextureView.getWidth(), mTextureView.getHeight());
         } else {
             mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
         }
@@ -1064,9 +661,6 @@ public abstract class CameraBaseFragment extends Fragment
                 } else if (facing != null && facing == CameraCharacteristics.LENS_FACING_BACK) {
                     mBackCameraId = cameraId;
                 }
-                if (!TextUtils.isEmpty(mFrontCameraId) && !TextUtils.isEmpty(mBackCameraId) && ivSwitchCamera != null) {
-                    ivSwitchCamera.setVisibility(View.VISIBLE);
-                }
             }
 
             for (String cameraId : manager.getCameraIdList()) {
@@ -1075,21 +669,23 @@ public abstract class CameraBaseFragment extends Fragment
 
                 // We don't use a front facing camera in this sample.
                 Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
-                if (cameraControllerViewModel.getCameraSelection() == CameraSelection.BACK) {
+                if (cameraSelection == CameraSelection.BACK) {
                     if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
                         continue;
                     }
-                } else if (cameraControllerViewModel.getCameraSelection() == CameraSelection.FRONT)
+                } else if (cameraSelection == CameraSelection.FRONT)
                     if (facing != null && facing == CameraCharacteristics.LENS_FACING_BACK) {
                         continue;
                     }
 
 
+                mCameraId = cameraId;
                 StreamConfigurationMap map = characteristics.get(
                         CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
                 if (map == null) {
                     continue;
                 }
+
                 // For still image captures, we use the largest available size.
                 Size largest = Collections.max(
                         Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
@@ -1100,7 +696,6 @@ public abstract class CameraBaseFragment extends Fragment
                 mImageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
                     @Override
                     public void onImageAvailable(final ImageReader reader) {
-                        Log.d(TAG, "setOnImageAvailableListener: " + cameraControllerViewModel.getPeekValue());
                         Image mImage = reader.acquireLatestImage();
                         ByteBuffer buffer = mImage.getPlanes()[0].getBuffer();
                         byte[] bytes = new byte[buffer.remaining()];
@@ -1108,10 +703,12 @@ public abstract class CameraBaseFragment extends Fragment
                         FileOutputStream output = null;
                         Bitmap rotatedBitmap = null;
                         Bitmap originalBitmap = null;
-
+                        File mFile = null;
                         try {
                             String currTime = "" + System.currentTimeMillis();
-                            File mFile = new File(getContext().getCacheDir(), "pic.jpg");
+
+                            // Write bitmap to file, this way we can get rotated bitmap
+                            mFile = File.createTempFile(currTime + "", "pic.jpg");
                             output = new FileOutputStream(mFile);
                             output.write(bytes);
 
@@ -1119,7 +716,6 @@ public abstract class CameraBaseFragment extends Fragment
 
                             ExifInterface exif = new ExifInterface(mFile.getPath());
                             int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ORIENTATION_UNDEFINED);
-                            Log.d(TAG, "onImageAvailable: exif " + exif.getAttribute(ExifInterface.TAG_ORIENTATION));
 
                             int rotationAngle = 0;
                             if (orientation == ExifInterface.ORIENTATION_ROTATE_90)
@@ -1133,28 +729,20 @@ public abstract class CameraBaseFragment extends Fragment
                             matrix.setRotate(rotationAngle, (float) originalBitmap.getWidth() / 2, (float) originalBitmap.getHeight() / 2);
                             rotatedBitmap = Bitmap.createBitmap(originalBitmap, 0, 0, originalBitmap.getWidth(), originalBitmap.getHeight(), matrix, true);
 
-                            File originalImage = FileUtils.getFile(getContext(), bucketName, cameraControllerViewModel.getPeekValue() + ".jpg");
-                            if (originalImage.exists()) {
-                                originalImage.delete();
-                            }
-                            if (cameraControllerViewModel.getCameraSelection() == CameraSelection.FRONT) {
+                            if (cameraSelection == CameraSelection.FRONT) {
                                 Log.d(TAG, "onImageAvailable: Fliped");
                                 Matrix imageFlipMatrix = new Matrix();
                                 imageFlipMatrix.setScale(-1, 1);
                                 rotatedBitmap = Bitmap.createBitmap(rotatedBitmap, 0, 0, rotatedBitmap.getWidth(), rotatedBitmap.getHeight(), imageFlipMatrix, true);
                             }
-                            originalImage = FileUtils.getFile(getContext(), bucketName, currTime + ".jpg");
-                            FileOutputStream originalStream = new FileOutputStream(originalImage);
-                            rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 60, originalStream);
-                            originalStream.close();
-                            cameraControllerViewModel.changeTimeStamp(cameraControllerViewModel.getPeekValue(), currTime);
-                            cameraControllerViewModel.removeFirst();
-                            if (singlePhotoMode)
-                                mListener.onComplete();
+                            getImage(rotatedBitmap);
+
                         } catch (IOException e) {
                             e.printStackTrace();
                         } finally {
                             mImage.close();
+                            if (mFile != null)
+                                mFile.delete();
                             if (null != output) {
                                 try {
                                     output.close();
@@ -1162,6 +750,7 @@ public abstract class CameraBaseFragment extends Fragment
                                     e.printStackTrace();
                                 }
                             }
+
                             // recycle bitmap storage
                             if (originalBitmap != null)
                                 originalBitmap.recycle();
@@ -1234,18 +823,6 @@ public abstract class CameraBaseFragment extends Fragment
                     mTextureView.setAspectRatio(
                             mPreviewSize.getHeight(), mPreviewSize.getWidth());
                 }
-
-                // Check if the flash is supported.
-                Boolean available = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE);
-                mFlashSupported = available == null ? false : available;
-                if (mFlashSupported && ivFlash != null) {
-                    Log.d(TAG, "setUpCameraOutputs: flash " + flashType);
-                    ivFlash.setImageDrawable(getResources().getDrawable(cameraControllerViewModel.getFlashType().resourceId));
-                    ivFlash.setVisibility(View.VISIBLE);
-                } else {
-                    ivFlash.setVisibility(View.GONE);
-                }
-                mCameraId = cameraId;
                 return;
             }
         } catch (CameraAccessException e) {
@@ -1253,6 +830,7 @@ public abstract class CameraBaseFragment extends Fragment
         } catch (NullPointerException e) {
             // Currently an NPE is thrown when the Camera2API is used but not supported on the
             // device this code runs.
+            Log.e(TAG, "setUpCameraOutputs: ", e);
             ErrorDialog.newInstance(getString(R.string.camera_error))
                     .show(getChildFragmentManager(), FRAGMENT_DIALOG);
         }
@@ -1437,7 +1015,7 @@ public abstract class CameraBaseFragment extends Fragment
     /**
      * Initiate a still image capture.
      */
-    private void takePicture() {
+    public void takePicture() {
         if (isCameraOpen)
             lockFocus();
     }
@@ -1478,6 +1056,50 @@ public abstract class CameraBaseFragment extends Fragment
     }
 
     /**
+     * This function will be called on triggering capture of the click
+     *
+     * @param bitmap
+     */
+    public abstract void getImageThumb(Bitmap bitmap);
+
+    /**
+     * This function will give you high quality rotated bitmap
+     *
+     * @param bitmap
+     */
+    public abstract void getImage(Bitmap bitmap);
+
+    private void setUpScreenOrientationListener() {
+        //Orientation Listener to detect the rotation
+        OrientationEventListener mOrientationListener = new OrientationEventListener(getContext(),
+                SensorManager.SENSOR_DELAY_NORMAL) {
+            @Override
+            public void onOrientationChanged(int rotation) {
+                if (rotation > 330 && rotation < 360 || rotation < 30) {
+                    orientation = 0;
+                } else if (rotation > 60 && rotation < 120) {
+                    orientation = 3;
+                } else if (rotation > 150 && rotation < 210) {
+                    orientation = 2;
+                } else if (rotation > 240 && rotation < 300) {
+                    orientation = 1;
+                }
+                if (temp != orientation) {
+                    int rotationResult = temp - orientation;
+                    if (rotationResult == -1 || rotationResult == 3) {
+                        //rotateView by 90;
+                    } else if (rotationResult == 1 || rotationResult == -3) {
+                        //rotateView by -90;
+                    }
+                    temp = orientation;
+                }
+            }
+        };
+        mOrientationListener.enable();
+
+    }
+
+    /**
      * Capture a still picture. This method should be called when we get a response in
      * {@link #mCaptureCallback} from both {@link #lockFocus()}.
      */
@@ -1494,12 +1116,10 @@ public abstract class CameraBaseFragment extends Fragment
 
         Bitmap bm = mTextureView.getBitmap();
         Matrix matrix = new Matrix();
-        int rotation = ((CameraControllerActivity) getActivity()).getOrientation();
+        int rotation = orientation;
         matrix.setRotate(THUMB_ORIENTATIONS.get(rotation), (float) bm.getWidth() / 2, (float) bm.getHeight() / 2);
         Bitmap rotatedBitmap = Bitmap.createBitmap(bm, 0, 0, bm.getWidth(), bm.getHeight(), matrix, true);
-        CaptureData captureData = new CaptureData(rotatedBitmap, "" + System.currentTimeMillis());
-        cameraControllerViewModel.addToQueue(captureData.getOriginalFileName());
-        cameraControllerViewModel.tempBitmap.postValue(captureData);
+        getImageThumb(rotatedBitmap);
         try {
             final Activity activity = getActivity();
             if (null == activity || null == mCameraDevice) {
@@ -1586,7 +1206,7 @@ public abstract class CameraBaseFragment extends Fragment
      */
     private void setAutoFlash(CaptureRequest.Builder requestBuilder) {
         if (mFlashSupported) {
-            switch (cameraControllerViewModel.getFlashType().currentType) {
+            switch (flashType.currentType) {
                 case 2:
                     requestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
                             CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
@@ -1605,53 +1225,8 @@ public abstract class CameraBaseFragment extends Fragment
         }
     }
 
-    @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
-        if (context instanceof OnCaptureInteractionListener) {
-            mListener = (OnCaptureInteractionListener) context;
-        } else {
-            throw new RuntimeException(context.toString()
-                    + " must implement OnListFragmentInteractionListener");
-        }
-    }
-
-    @Override
-    public void onDetach() {
-        super.onDetach();
-        mListener = null;
-    }
-
-    /**
-     * This function is used to rotate the views with device rotation.
-     *
-     * @param t angle to rotate
-     */
-    public void rotateView(final int t) {
-        if (enableRotationAnimation) {
-            AnimationSet animSet = new AnimationSet(true);
-            animSet.setInterpolator(new DecelerateInterpolator());
-            animSet.setFillAfter(true);
-            animSet.setFillEnabled(true);
-            final RotateAnimation animRotate = new RotateAnimation(fromDegree, fromDegree + t,
-                    RotateAnimation.ZORDER_TOP, 0.5f,
-                    RotateAnimation.ZORDER_TOP, 0.5f);
-            animRotate.setDuration(500);
-            animRotate.setFillAfter(true);
-            animSet.addAnimation(animRotate);
-            badgeImageView.startAnimation(animSet);
-            ObjectAnimator imageViewObjectAnimator = ObjectAnimator.ofFloat(btnDone,
-                    "rotation", fromDegree, fromDegree + t);
-            imageViewObjectAnimator.setInterpolator(new DecelerateInterpolator());
-            imageViewObjectAnimator.setDuration(500); // miliseconds
-            imageViewObjectAnimator.start();
-            fromDegree = t + fromDegree;
-        }
-    }
-
     public void switchCamera() {
         cameraSelection = cameraSelection == CameraSelection.BACK ? CameraSelection.FRONT : CameraSelection.BACK;
-        cameraControllerViewModel.setCameraSelection(cameraSelection);
         reopenCamera();
     }
 
@@ -1666,20 +1241,6 @@ public abstract class CameraBaseFragment extends Fragment
 
     public abstract int getTextureResource();
 
-    /**
-     * This Listener is used to communicate with Parent Activity {@link CameraControllerActivity}
-     */
-    public interface OnCaptureInteractionListener {
-        /**
-         * When user clicks on preview icon
-         */
-        void goToPreviewMode();
-
-        /**
-         * When user clicks Done button
-         */
-        void onComplete();
-    }
 
     /**
      * Compares two {@code Size}s based on their areas.
