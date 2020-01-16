@@ -5,7 +5,15 @@ We have developed this module while working on one of our project
 ![](images/easy_cam_logo.png)
 
 ### How to use
-1. Add dependency in module gradle file  `implementation 'in.balakrishnan.easycam:easycam:0.0.2'` 
+1. Add dependency in module gradle file  
+   ` implementation 'in.balakrishnan.easycam:easycam:0.0.2'`
+   
+   ` implementation 'androidx.recyclerview:recyclerview:1.1.0'`
+   
+   ` implementation 'androidx.lifecycle:lifecycle-extensions:2.2.0-rc03'`
+   
+   (Viewmodel and Recyclerview are used to maintain state and list the images. We are working on to provide support without viemodel or recyclerview)
+   
 2. Start the Intent when required from activity or fragment 
 
         Intent intent = new Intent(this, CameraControllerActivity.class);
