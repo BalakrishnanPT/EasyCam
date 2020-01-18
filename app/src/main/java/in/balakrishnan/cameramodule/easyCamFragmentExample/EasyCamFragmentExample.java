@@ -10,7 +10,9 @@ import android.view.ViewGroup;
 import androidx.fragment.app.Fragment;
 
 import in.balakrishnan.cameramodule.R;
+import in.balakrishnan.easycam.capture.CameraSelection;
 import in.balakrishnan.easycam.capture.EasyCamFragment;
+import in.balakrishnan.easycam.capture.FlashType;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -20,6 +22,10 @@ public class EasyCamFragmentExample extends EasyCamFragment {
 
     public EasyCamFragmentExample() {
         // Required empty public constructor
+        setCameraSelection(CameraSelection.BACK);
+        setFlashType(FlashType.ON);
+        setFullscreenMode(false);
+        setManualFocus(true);
     }
 
     @Override
