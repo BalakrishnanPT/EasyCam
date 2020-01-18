@@ -66,8 +66,6 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
-import in.balakrishnan.easycam.CameraControllerActivity;
-import in.balakrishnan.easycam.FileUtils;
 import in.balakrishnan.easycam.R;
 import in.balakrishnan.easycam.imageBadgeView.ImageBadgeView;
 
@@ -146,10 +144,6 @@ public abstract class EasyCamFragment extends Fragment
     int orientation = 0;
     int temp = 0;
     /**
-     * Set this flag as true to enable 'Preview' and 'Done' views animation using orientation
-     */
-    private boolean enableRotationAnimation;
-    /**
      * This int value is used to set boundary value to check the click
      */
     private int CLICK_ACTION_THRESHOLD = 200;
@@ -188,10 +182,6 @@ public abstract class EasyCamFragment extends Fragment
      */
     private ImageReader mImageReader;
     /**
-     * This is the output file for our picture.
-     */
-    private File mFile;
-    /**
      * {@link CaptureRequest.Builder} for the camera preview
      */
     private CaptureRequest.Builder mPreviewRequestBuilder;
@@ -216,6 +206,7 @@ public abstract class EasyCamFragment extends Fragment
     /**
      * Orientation of the camera sensor
      */
+
     private int mSensorOrientation;
     private CameraSelection cameraSelection = CameraSelection.BACK;
     /**
@@ -411,6 +402,38 @@ public abstract class EasyCamFragment extends Fragment
             Log.e(TAG, "Couldn't find any suitable preview size");
             return choices[0];
         }
+    }
+
+    public void setFlashType(FlashType flashType) {
+        this.flashType = flashType;
+    }
+
+    public void setCameraSelection(CameraSelection cameraSelection) {
+        this.cameraSelection = cameraSelection;
+    }
+
+    public void setFullscreenMode(boolean fullscreenMode) {
+        this.fullscreenMode = fullscreenMode;
+    }
+
+    public void setManualFocus(boolean manualFocus) {
+        this.manualFocus = manualFocus;
+    }
+
+    public boolean isFlashSupported() {
+        return mFlashSupported;
+    }
+
+    public boolean isFullscreenMode() {
+        return fullscreenMode;
+    }
+
+    public boolean isCameraOpen() {
+        return isCameraOpen;
+    }
+
+    public boolean isManualFocus() {
+        return manualFocus;
     }
 
     /**
@@ -610,12 +633,6 @@ public abstract class EasyCamFragment extends Fragment
             return false;
         }
         return characteristics.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) >= 1;
-    }
-
-    @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
-        mFile = FileUtils.getFile(getContext(), bucketName, "pic.jgp");
     }
 
     @Override
@@ -954,7 +971,7 @@ public abstract class EasyCamFragment extends Fragment
                             try {
                                 // Auto focus should be continuous for camera preview.
                                 mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
-                                        CaptureRequest.CONTROL_AF_MODE_AUTO);
+                                        CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
                                 // Flash is automatically enabled when necessary.
                                 setAutoFlash(mPreviewRequestBuilder);
 
@@ -1132,7 +1149,7 @@ public abstract class EasyCamFragment extends Fragment
 
             // Use the same AE and AF modes as the preview.
             captureBuilder.set(CaptureRequest.CONTROL_AF_MODE,
-                    CaptureRequest.CONTROL_AF_MODE_AUTO);
+                    CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
             setAutoFlash(captureBuilder);
 
             // Orientation
@@ -1144,8 +1161,7 @@ public abstract class EasyCamFragment extends Fragment
                 public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                                                @NonNull CaptureRequest request,
                                                @NonNull TotalCaptureResult result) {
-                    Log.d(TAG, mFile.toString());
-
+                    Log.d(TAG, "onCaptureCompleted: ");
                 }
             };
 
