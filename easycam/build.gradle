@@ -16,7 +16,7 @@ ext {
     libraryDescription = 'This library will help you to integrate camera with preview module with minimal configuration'
     siteUrl = 'https://github.com/BalakrishnanPT/EasyCam'
     gitUrl = 'https://github.com/BalakrishnanPT/EasyCam.git'
-    libraryVersion = '0.0.3-rc5'
+    libraryVersion = '0.0.3-rc7'
     developerId = 'bk24'
     developerName = 'Bala'
     developerEmail = 'balakrishnan.750@gmail.com'
