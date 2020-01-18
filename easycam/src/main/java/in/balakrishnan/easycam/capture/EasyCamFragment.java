@@ -506,7 +506,7 @@ public abstract class EasyCamFragment extends Fragment
      * @param view
      */
     private void initializeViews(View view) {
-        mTextureView = view.findViewById(getTextureResource());
+        mTextureView = view.findViewById(setTextureResource());
         mTextureView.setFullScreenMode(fullscreenMode);
         setUpScreenOrientationListener();
     }
@@ -1255,7 +1255,7 @@ public abstract class EasyCamFragment extends Fragment
         }
     }
 
-    public abstract int getTextureResource();
+    public abstract int setTextureResource();
 
 
     /**

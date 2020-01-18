@@ -57,7 +57,7 @@ public class EasyCamFragmentExample extends EasyCamFragment {
     }
 
     @Override
-    public int getTextureResource() {
+    public int setTextureResource() {
         return R.id.texture;
     }
 
